@@ -1,0 +1,10 @@
+[Unit]
+Description=CSGO
+
+[Service]
+ExecStart=/opt/csgo-ds/srcds_run -game csgo -console -usercon -net_port_try 1 -ip 0.0.0.0 +game_type 0 +game_mode 1 +mapgroup mg_active +map de_dust2
+User=steam
+
+[Install]
+WantedBy=multi-user.target
+

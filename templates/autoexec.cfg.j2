@@ -1,0 +1,8 @@
+log on
+hostname "{{ server_name }}"
+rcon_password "{{ rcon_password }}"
+sv_password "{{ sv_password }}" //Only set this if you intend to have a private server!
+sv_cheats 0
+sv_lan 0
+exec banned_user.cfg
+exec banned_ip.cfg

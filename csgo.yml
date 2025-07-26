@@ -1,0 +1,117 @@
+---
+- name: Install CSGO
+  hosts: all
+  gather_facts: false
+  become: true
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Create an account for SteamCMD
+      ansible.builtin.user:
+        name: steam
+        create_home: true
+        shell: /sbin/nologin
+
+    - name: Install software-properties-common
+      ansible.builtin.apt:
+        name: software-properties-common
+        update_cache: true
+        state: present
+
+    - name: Add non-free repo
+      ansible.builtin.command:
+        cmd: apt-add-repository non-free
+      changed_when: true
+
+    - name: Enable x86 packages
+      ansible.builtin.command:
+        cmd: dpkg --add-architecture i386
+      changed_when: true
+
+    - name: Agree to ToS
+      ansible.builtin.command:
+        cmd: debconf-set-selections
+        stdin: "{{ item }}"
+      loop:
+        - steam steam/question select "I AGREE"
+        - steam steam/license note ''
+      changed_when: true
+
+    - name: Install steamcmd
+      ansible.builtin.apt:
+        name: steamcmd:i386
+        update_cache: true
+        state: present
+
+    - name: Create directory for CSGO files to live in
+      ansible.builtin.file:
+        path: /opt/csgo-ds
+        state: directory
+        owner: steam
+        group: root
+        mode: '0755'
+
+    - name: Download CSGO
+      ansible.builtin.command:
+        cmd: /usr/games/steamcmd +force_install_dir /opt/csgo-ds +login anonymous +app_update 740 validate +quit
+      changed_when: true
+
+    - name: Download and install sourcemod
+      ansible.builtin.unarchive:
+        src: https://sm.alliedmods.net/smdrop/1.12/sourcemod-1.12.0-git7210-linux.tar.gz
+        dest: /opt/csgo-ds/csgo
+        remote_src: true
+
+    - name: Copy files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - src: files/nolobbyreservation.games.txt
+          dest: /opt/csgo-ds/csgo/addons/sourcemod/gamedata/nolobbyreservation.games.txt
+
+        - src: files/nolobbyreservation.smx
+          dest: /opt/csgo-ds/csgo/addons/sourcemod/plugins/nolobbyreservation.smx
+
+        - src: files/nolobbyreservation.sp.txt
+          dest: /opt/csgo-ds/csgo/addons/sourcemod/scripting/nolobbyreservation.sp.txt
+
+    - name: Install service
+      ansible.builtin.copy:
+        src: files/csgo.service
+        dest: /etc/systemd/system/csgo.service
+        owner: root
+        group: root
+        mode: '644'
+
+    - name: Copy server.cfg
+      ansible.builtin.copy:
+        src: files/server.cfg
+        dest: /opt/csgo-ds/csgo/cfg/server.cfg
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Template out autoexec
+      ansible.builtin.template:
+        src: templates/autoexec.cfg.j2
+        dest: /opt/csgo-ds/csgo/cfg/autoexec.cfg
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Adjust ownership
+      ansible.builtin.file:
+        path: /opt/csgo-ds
+        recurse: true
+        owner: steam
+
+    - name: Enable and start service
+      ansible.builtin.systemd_service:
+        name: csgo.service
+        daemon_reload: true
+        state: started
+        enabled: true
